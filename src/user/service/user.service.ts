@@ -1,13 +1,20 @@
-import { Inject } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { databaseResponse } from 'src/utils/dataBankResponse';
 import { Repository } from 'typeorm';
-import { UserCreationDto, UpdateUserDto } from '../dto/user.dto';
+import {
+  UserCreationDto,
+  UpdateUserDto,
+  UpdateUserPassDto,
+} from '../dto/user.dto';
 import { Role } from '../entity/role.entity';
 import { UserEntity } from '../entity/user.entity';
 
+@Injectable()
 export class UserService {
   constructor(
     @Inject('USER_REPOSITORY') private userRepository: Repository<UserEntity>,
   ) {}
+
   async createUser(user: UserCreationDto): Promise<UserEntity> {
     let role: number;
     return new Promise(async (resolve, reject) => {
@@ -22,15 +29,24 @@ export class UserService {
       }
     });
   }
+
   async findUser(id: number): Promise<UserEntity> {
     return new Promise(async (resolve, reject) => {
       try {
-        resolve(this.userRepository.findOneBy({ id }));
+        const user = await this.userRepository.findOneBy({ id });
+        if (!user)
+          reject({ code: HttpStatus.NOT_FOUND, message: 'User not found.' });
+        resolve(user);
       } catch (error) {
         reject({ code: error.code, message: error.detail });
       }
     });
   }
+
+  async getUserList(): Promise<UserEntity> {
+    return databaseResponse(async () => await this.userRepository.find());
+  }
+
   async changeUserRole(userId: number, newRole: string): Promise<UserEntity> {
     return new Promise(async (resolve, reject) => {
       try {
@@ -43,27 +59,34 @@ export class UserService {
       }
     });
   }
+
   async updateUserInfo(
     userId: number,
     updateUser: UpdateUserDto,
   ): Promise<UserEntity> {
     return new Promise(async (resolve, reject) => {
       try {
-        let user = await this.userRepository.findOneBy({ id: userId });
-        if (updateUser.newPassword) this.updatePassword(user, updateUser);
-        user = { ...user, ...updateUser };
-        await this.userRepository.save(user);
-        resolve(user);
+        await this.userRepository.update({ id: userId }, updateUser);
+        resolve(this.userRepository.findOneBy({ id: userId }));
       } catch (error) {
         reject({ code: error.code, message: error.detail });
       }
     });
   }
 
-  private updatePassword(user: UserEntity, updateUser: UpdateUserDto) {
-    if (user.password === updateUser.oldPassword)
-      updateUser.password = updateUser.newPassword;
-    delete updateUser.newPassword;
-    delete updateUser.oldPassword;
+  async updatePassword(userId: number, passwordInfo: UpdateUserPassDto) {
+    return databaseResponse(async () => {
+      const user = await this.findUser(userId);
+      if (passwordInfo.old_password === user.password) {
+        user.password = passwordInfo.password;
+        this.userRepository.save(user);
+        return { message: 'Password changed succesfully' };
+      } else {
+        return {
+          code: HttpStatus.BAD_REQUEST,
+          message: 'old_password does not match current password',
+        };
+      }
+    });
   }
 }

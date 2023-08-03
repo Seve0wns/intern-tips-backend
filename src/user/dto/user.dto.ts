@@ -40,16 +40,18 @@ export class UpdateUserDto {
   @IsNotEmpty()
   @IsString()
   readonly email: string;
+}
 
-  @IsOptional()
+export class UpdateUserPassDto {
+  @IsNotEmpty()
   @IsString()
-  oldPassword: string;
+  old_password: string;
 
-  @IsOptional()
   @IsNotEmpty()
   @IsString()
   @IsValidPassword()
-  newPassword: string;
-
   password: string;
+
+  @IsMatch('password')
+  password_confirm: string;
 }

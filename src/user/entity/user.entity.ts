@@ -1,5 +1,6 @@
 import { Exclude, Transform } from 'class-transformer';
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { TipEntity } from 'src/tip/entity/tip.entity';
+import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { Role } from './role.entity';
 
 @Entity({ name: 'users' })
@@ -7,14 +8,17 @@ export class UserEntity {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ length: 30 })
+  @Column({ length: 30, unique: true })
   username: string;
+
+  @OneToMany(() => TipEntity, (tip) => tip.author)
+  tips: TipEntity[];
 
   @Column({ length: 12 })
   @Exclude({ toPlainOnly: true })
   password: string;
 
-  @Column({ length: 25 })
+  @Column({ length: 25, unique: true })
   email: string;
 
   @Column()

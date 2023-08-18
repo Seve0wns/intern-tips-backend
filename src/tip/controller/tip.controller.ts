@@ -7,12 +7,16 @@ import {
   Param,
   Post,
   Put,
+  Req,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { JwtAuthGuard } from 'src/core/auth/jwtAuth.guard';
 import { TipCreationDto, TipUpdateDto } from '../dto/tip.dto';
 import { FindTipByIdDto } from '../dto/tipParams.dto';
 import { TipService } from '../service/tip.service';
 
+@UseGuards(JwtAuthGuard)
 @Controller('tips')
 export class tipController {
   constructor(private tipService: TipService) {}
@@ -40,13 +44,14 @@ export class tipController {
   public async update(
     @Param() params: FindTipByIdDto,
     @Body() updateInfo: TipUpdateDto,
+    @Req() req,
   ) {
-    return await this.tipService.updateTip(params.id, updateInfo);
+    return await this.tipService.updateTip(params.id, updateInfo, req.user);
   }
 
   @Delete(':id')
   @UseInterceptors(ClassSerializerInterceptor)
-  public async destroy(@Param() params: FindTipByIdDto) {
-    return await this.tipService.destroyTip(params.id);
+  public async destroy(@Param() params: FindTipByIdDto, @Req() req) {
+    return await this.tipService.destroyTip(params.id, req.user);
   }
 }

@@ -7,8 +7,12 @@ import {
   Patch,
   Post,
   Put,
+  Req,
+  UnauthorizedException,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { JwtAuthGuard } from 'src/core/auth/jwtAuth.guard';
 import {
   UserCreationDto,
   UpdateUserDto,
@@ -22,15 +26,25 @@ import { UserService } from '../service/user.service';
 export class userController {
   constructor(private readonly userService: UserService) {}
 
+  @UseGuards(JwtAuthGuard)
   @Get()
   @UseInterceptors(ClassSerializerInterceptor)
-  public async findAll(): Promise<UserEntity> {
-    return await this.userService.getUserList();
+  public async findAll(@Req() req): Promise<UserEntity> {
+    if (req.user?.role == 'manager' || req.user?.role == 'root') {
+      return await this.userService.getUserList();
+    } else throw new UnauthorizedException();
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get(':id')
   @UseInterceptors(ClassSerializerInterceptor)
-  public async findOne(@Param() params: FindUserByIdDto): Promise<UserEntity> {
+  public async findOne(
+    @Param() params: FindUserByIdDto,
+    @Req() req,
+  ): Promise<UserEntity> {
+    if (req.user?.id != params.id && req.user?.role === 'employee') {
+      throw new UnauthorizedException();
+    }
     return await this.userService.findUser(params.id);
   }
 
@@ -44,22 +58,30 @@ export class userController {
     }
   }
 
+  @UseGuards(JwtAuthGuard)
   @Patch(':id')
   @UseInterceptors(ClassSerializerInterceptor)
   public async changeRole(
     @Param() params: FindUserByIdDto,
     @Body() newRole: ChangeRoleDto,
+    @Req() req,
   ): Promise<UserEntity> {
-    return await this.userService.changeUserRole(params.id, newRole.newRole);
+    if (req.user?.role == 'root') {
+      return await this.userService.changeUserRole(params.id, newRole.newRole);
+    }
   }
 
+  @UseGuards(JwtAuthGuard)
   @Put(':id')
   @UseInterceptors(ClassSerializerInterceptor)
   public async updateUser(
     @Param() params: FindUserByIdDto,
     @Body() updateInfo: UpdateUserDto,
+    @Req() req,
   ): Promise<UserEntity> {
-    return await this.userService.updateUserInfo(params.id, updateInfo);
+    if (params.id == req.user?.id) {
+      return await this.userService.updateUserInfo(params.id, updateInfo);
+    }
   }
 
   @Patch(':id/password')
@@ -67,7 +89,10 @@ export class userController {
   public async updatePassword(
     @Param() params: FindUserByIdDto,
     @Body() passwordInfo: UpdateUserPassDto,
+    @Req() req,
   ) {
-    return await this.userService.updatePassword(params.id, passwordInfo);
+    if (params.id == req.user?.id) {
+      return await this.userService.updatePassword(params.id, passwordInfo);
+    }
   }
 }

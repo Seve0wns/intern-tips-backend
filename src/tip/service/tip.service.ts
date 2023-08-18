@@ -1,5 +1,7 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { CategoryService } from 'src/category/service/category.service';
+import { JwtPayload } from 'src/core/auth/auth.dto';
+import { Role } from 'src/user/entity/role.entity';
 import { UserService } from 'src/user/service/user.service';
 import { databaseResponse } from 'src/utils/dataBankResponse';
 import { Repository } from 'typeorm';
@@ -36,9 +38,13 @@ export class TipService {
     });
   }
 
-  async destroyTip(id: number) {
+  async destroyTip(id: number, requester: JwtPayload) {
     return new Promise(async (resolve, reject) => {
       try {
+        const tip = await this.tipRepository.findOneBy({ id });
+        if (tip.id != requester?.id && Role[requester?.role] === 3) {
+          throw new UnauthorizedException();
+        }
         await this.tipRepository.delete(id);
         resolve('Tip deleted.');
       } catch (error) {
@@ -47,7 +53,11 @@ export class TipService {
     });
   }
 
-  async updateTip(id: number, updateInfo: TipUpdateDto): Promise<TipEntity> {
+  async updateTip(
+    id: number,
+    updateInfo: TipUpdateDto,
+    requester: JwtPayload,
+  ): Promise<TipEntity> {
     return new Promise(async (resolve, reject) => {
       try {
         const { categoryId, ...updateTip } = updateInfo;
@@ -58,6 +68,9 @@ export class TipService {
           select: { author: { id: true, username: true } },
           where: { id },
         });
+        if (tip.id != requester?.id && Role[requester?.role] === 3) {
+          throw new UnauthorizedException();
+        }
         tip = { ...tip, ...updateTip, category };
         this.tipRepository.save(tip);
         resolve(tip);

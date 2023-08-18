@@ -2,6 +2,7 @@ import { Exclude, Transform } from 'class-transformer';
 import { TipEntity } from 'src/tip/entity/tip.entity';
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { Role } from './role.entity';
+import * as bcrypt from 'bcrypt';
 
 @Entity({ name: 'users' })
 export class UserEntity {
@@ -14,9 +15,13 @@ export class UserEntity {
   @OneToMany(() => TipEntity, (tip) => tip.author)
   tips: TipEntity[];
 
-  @Column({ length: 12 })
+  @Column()
   @Exclude({ toPlainOnly: true })
   password: string;
+
+  @Column()
+  @Exclude({ toPlainOnly: true })
+  salt: string;
 
   @Column({ length: 25, unique: true })
   email: string;
@@ -25,9 +30,9 @@ export class UserEntity {
   @Transform(({ value }) => Role[value], { toPlainOnly: true })
   role: number;
 
-  constructor(data) {
-    this.id = data?.id;
-    this.username = data?.username;
-    this.email = data?.email;
+  async checkPassword(password: string): Promise<boolean> {
+    // console.log(password);
+    // console.log(this);
+    return this.password === (await bcrypt.hash(password, this.salt));
   }
 }

@@ -1,4 +1,9 @@
-import { HttpStatus, Inject, Injectable } from '@nestjs/common';
+import {
+  HttpStatus,
+  Inject,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { databaseResponse } from 'src/utils/dataBankResponse';
 import { Repository } from 'typeorm';
 import {
@@ -8,6 +13,8 @@ import {
 } from '../dto/user.dto';
 import { Role } from '../entity/role.entity';
 import { UserEntity } from '../entity/user.entity';
+import * as bcrypt from 'bcrypt';
+import { JwtPayload, LoginCredentials } from 'src/core/auth/auth.dto';
 
 @Injectable()
 export class UserService {
@@ -21,9 +28,14 @@ export class UserService {
       try {
         role =
           Role[(await this.userRepository.count()) > 0 ? 'employee' : 'root'];
-        const { id } = (await this.userRepository.insert({ ...user, role }))
-          .generatedMaps[0];
-        resolve(new UserEntity({ id, ...user, role }));
+        const createdUser = this.userRepository.create({ ...user, role });
+        createdUser.salt = await bcrypt.genSalt();
+        createdUser.password = await this.hashPassword(
+          user.password,
+          createdUser.salt,
+        );
+        const newCreatedUser = await this.userRepository.save(createdUser);
+        resolve(newCreatedUser);
       } catch (error) {
         reject({ code: error.code, message: error.detail });
       }
@@ -88,5 +100,18 @@ export class UserService {
         };
       }
     });
+  }
+
+  async checkCredentials(credentials: LoginCredentials): Promise<JwtPayload> {
+    const user = await this.userRepository.findOneBy({
+      email: credentials.email,
+    });
+    if (await user.checkPassword(credentials.password)) {
+      return { id: user.id, email: user.email, role: Role[user.role] };
+    }
+  }
+
+  private async hashPassword(password: string, salt: string): Promise<string> {
+    return bcrypt.hash(password, salt);
   }
 }
